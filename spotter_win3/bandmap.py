@@ -1,7 +1,8 @@
-"""Bandmap scope widget: vertical frequency spine, RBN spots plotted by
-frequency with alpha-fade aging. No boxed border — left spine + tick
-labels only, transparent background (spec item 4). POTA's mirrored lane
-is added in Task 4; the UI polish pass (Task 5) covers exact styling.
+"""Bandmap scope widget: vertical frequency spine, RBN and POTA spots each
+in their own lane (left/right), plotted by frequency with alpha-fade
+aging. No boxed border — left spine + tick labels only, transparent
+background (spec item 4). Exact mirrored-spine/header styling is the
+Task 5 UI polish pass; this lays out functionally distinct lanes only.
 """
 
 from __future__ import annotations
@@ -37,7 +38,8 @@ class BandScope(tk.Frame):
 
     def render(
         self,
-        spots,
+        cluster_spots,
+        pota_spots,
         center_khz: float,
         bandwidth_khz: float,
         window_minutes: float,
@@ -51,33 +53,37 @@ class BandScope(tk.Frame):
         self._texts.clear()
         self._spot_positions.clear()
 
-        visible = [s for s in spots if in_window(s.freq_khz, center_khz, bandwidth_khz)]
-        visible.sort(key=lambda s: s.freq_khz)
-
         half = bandwidth_khz / 2
         low, high = center_khz - half, center_khz + half
         ticks = [low, center_khz, high]
         self.ax.set_yticks([y_for_freq(t, center_khz, bandwidth_khz) for t in ticks])
         self.ax.set_yticklabels([f"{t / 1000:.3f}" for t in ticks])
 
+        self._render_lane(
+            cluster_spots, center_khz, bandwidth_khz, window_seconds, now,
+            x=0.08, ha="left", color="navy",
+        )
+        self._render_lane(
+            pota_spots, center_khz, bandwidth_khz, window_seconds, now,
+            x=0.92, ha="right", color="darkgreen",
+        )
+
+        self.canvas.draw_idle()
+
+    def _render_lane(
+        self, spots, center_khz, bandwidth_khz, window_seconds, now, *, x, ha, color
+    ) -> None:
+        visible = [s for s in spots if in_window(s.freq_khz, center_khz, bandwidth_khz)]
+        visible.sort(key=lambda s: s.freq_khz)
         for spot in visible:
             y = y_for_freq(spot.freq_khz, center_khz, bandwidth_khz)
             age = now - spot.last_seen
             alpha = age_alpha(age, window_seconds)
             text = self.ax.text(
-                0.08,
-                y,
-                spot.dx_call,
-                va="center",
-                ha="left",
-                alpha=alpha,
-                fontsize=8,
-                color="navy",
+                x, y, spot.dx_call, va="center", ha=ha, alpha=alpha, fontsize=8, color=color
             )
             self._texts.append(text)
             self._spot_positions.append((y, spot.dx_call))
-
-        self.canvas.draw_idle()
 
     def _on_click(self, event) -> None:
         if event.ydata is None or not self._spot_positions:

@@ -85,7 +85,20 @@ class ControlsPanel(tk.Frame):
         self.status_var = tk.StringVar(value=f"Cluster: {cluster_name}")
         tk.Label(status_frame, textvariable=self.status_var, fg="gray").pack(side=tk.LEFT, padx=(4, 0))
 
+        self.pota_status_var = tk.StringVar(value="POTA: not yet polled")
+        tk.Label(self, textvariable=self.pota_status_var, fg="gray").grid(
+            row=11, column=0, columnspan=2, sticky="w", pady=(4, 0)
+        )
+
     def set_connected(self, connected: bool, shown_count: int, cluster_name: str) -> None:
         self.dot_canvas.itemconfig(self._dot, fill="green" if connected else "red")
         state = "connected" if connected else "disconnected"
         self.status_var.set(f"{cluster_name}: {state} · shown {shown_count}")
+
+    def set_pota_status(self, poll_age_seconds: float | None, shown_count: int) -> None:
+        if poll_age_seconds is None:
+            self.pota_status_var.set("POTA: not yet polled")
+        else:
+            self.pota_status_var.set(
+                f"POTA: last poll {int(poll_age_seconds)}s ago · shown {shown_count}"
+            )

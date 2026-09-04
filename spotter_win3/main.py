@@ -10,6 +10,7 @@ from __future__ import annotations
 import queue
 import sys
 import threading
+import time
 import tkinter as tk
 
 if sys.platform == "win32":
@@ -31,6 +32,7 @@ from spotter_win3.cluster import ClusterConnection, Spot, parse_spot_line
 from spotter_win3.cluster_profiles import NC7J, ClusterProfile, band_for_freq_mhz
 from spotter_win3.controls import ControlsPanel
 from spotter_win3.filters import DedupCache
+from spotter_win3.pota import PotaSpot, PotaWorker
 from spotter_win3.spot_store import SpotStore
 
 POLL_INTERVAL_MS = 200
@@ -83,6 +85,7 @@ class App:
         self.store = SpotStore()
         self.dedup = DedupCache()
         self._connected = False
+        self._last_pota_poll: float | None = None
 
         root.title("DX Spotter")
         root.geometry("900x850+0+0")
@@ -117,6 +120,12 @@ class App:
 
         self.worker: ClusterWorker | None = None
         self._start_worker()
+
+        # POTA polls independently of the cluster connection/Clear cycle —
+        # it has no persistent connection to reconnect (spec item 8).
+        self.pota_worker = PotaWorker()
+        self.pota_worker.start()
+
         self.root.after(POLL_INTERVAL_MS, self._poll)
 
     def _start_worker(self) -> None:
@@ -136,14 +145,33 @@ class App:
         except queue.Empty:
             pass
 
+        try:
+            while True:
+                kind, payload = self.pota_worker.incoming.get_nowait()
+                if kind == "poll_attempt":
+                    self._last_pota_poll = payload
+                elif kind == "spot":
+                    self._handle_pota_spot(payload)
+        except queue.Empty:
+            pass
+
         self.store.prune(self.cfg.window_minutes * 60)
         self.scope.render(
             self.store.spots_for_feed("cluster"),
+            self.store.spots_for_feed("pota"),
             self.cfg.center_freq_mhz * 1000,
             self.cfg.bandwidth_khz,
             self.cfg.window_minutes,
         )
-        self.controls.set_connected(self._connected, len(self.store), NC7J.name)
+        self.controls.set_connected(
+            self._connected, len(self.store.spots_for_feed("cluster")), NC7J.name
+        )
+        pota_age = (
+            time.monotonic() - self._last_pota_poll
+            if self._last_pota_poll is not None
+            else None
+        )
+        self.controls.set_pota_status(pota_age, len(self.store.spots_for_feed("pota")))
         self.root.after(POLL_INTERVAL_MS, self._poll)
 
     def _handle_spot(self, spot: Spot) -> None:
@@ -155,6 +183,16 @@ class App:
             return
         self.store.upsert(
             spot.dx_call, band, "cluster", spot.freq_khz, spot.spotter, spot.comment
+        )
+
+    def _handle_pota_spot(self, spot: PotaSpot) -> None:
+        try:
+            band = band_for_freq_mhz(spot.freq_khz / 1000)
+        except ValueError:
+            return
+        # No dedup for POTA spots (spec item 8).
+        self.store.upsert(
+            spot.dx_call, band, "pota", spot.freq_khz, spot.spotter, spot.comment
         )
 
     def _on_set_band(self, freq_mhz: float) -> None:
