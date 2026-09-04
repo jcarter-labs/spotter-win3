@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(//c/Users/johnn/Projects/spotter-win1/**)",
+      "Glob(//c/Users/johnn/Projects/spotter-win1/**)",
+      "Grep(//c/Users/johnn/Projects/spotter-win1/**)",
+      "Read(//c/Users/johnn/Projects/spotter-win2/**)",
+      "Glob(//c/Users/johnn/Projects/spotter-win2/**)",
+      "Grep(//c/Users/johnn/Projects/spotter-win2/**)",
+      "Read(//c/Users/johnn/.claude/projects/C--Users-johnn-Projects-spotter-win1/**)",
+      "Glob(//c/Users/johnn/.claude/projects/C--Users-johnn-Projects-spotter-win1/**)",
+      "Grep(//c/Users/johnn/.claude/projects/C--Users-johnn-Projects-spotter-win1/**)",
+      "Read(//c/Users/johnn/.claude/projects/C--Users-johnn-Projects-spotter-win2/**)",
+      "Glob(//c/Users/johnn/.claude/projects/C--Users-johnn-Projects-spotter-win2/**)",
+      "Grep(//c/Users/johnn/.claude/projects/C--Users-johnn-Projects-spotter-win2/**)"
+    ]
+  }
+}
