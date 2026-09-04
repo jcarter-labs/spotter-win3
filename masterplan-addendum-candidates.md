@@ -25,3 +25,16 @@ review at Task 6 (end-of-build addendum). Not yet applied to masterplan-v2.md.
    command.
    *Triggered by:* a `!` command with a Windows backslash path failing with
    "No such file or directory" (backslashes stripped as escape characters).
+
+4. **Native GUI window inspection.** Claude has no direct visibility into a
+   running native Windows GUI window (unlike a browser page). For Tk apps,
+   drive the app's own entry point, add a short `root.after(...)`-scheduled
+   capture that calls `root.update()` then `PIL.ImageGrab.grab(bbox=...)`
+   using `winfo_rootx/rooty/width/height`, save to a file, then tear the
+   window down — Pillow is already a matplotlib dependency, so no new
+   install is needed. This should be a standard verification step for any
+   Tk/desktop UI task, not an ad hoc one-off.
+   *Triggered by:* needing to actually see spotter-win3's window during
+   Task 3 (embedded-controls UI) to catch a window-sizing bug (Clear
+   button/status line clipped off the right edge) that wasn't visible from
+   stdout/exit-code checks alone. See scripts/screenshot_app.py.

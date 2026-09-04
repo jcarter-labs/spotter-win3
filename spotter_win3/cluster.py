@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import socket
+import time
 from dataclasses import dataclass
 
 _SPOT_RE = re.compile(
@@ -55,14 +56,10 @@ class ClusterConnection:
         self._sock: socket.socket | None = None
         self._buf = b""
 
-    def connect(self, post_login_timeout: float = 2.0) -> str:
+    def connect(self, banner_timeout: float = 3.0, post_login_timeout: float = 2.0) -> str:
         self._sock = socket.create_connection((self._host, self._port), timeout=self._timeout)
-        banner = self._recv_available(self._timeout)
+        banner = self._recv_available(banner_timeout)
         self._sock.sendall(f"{self._callsign}\r\n".encode("ascii"))
-        # Short idle window, not self._timeout: the login response is short
-        # and static, so a long wait here just risks swallowing live spot
-        # traffic that arrives right after login into the banner text
-        # instead of leaving it for read_lines().
         banner += self._recv_available(post_login_timeout)
         return banner.decode("ascii", errors="replace")
 
@@ -95,16 +92,26 @@ class ClusterConnection:
             self._sock.close()
             self._sock = None
 
-    def _recv_available(self, timeout: float) -> bytes:
+    def _recv_available(self, total_timeout: float) -> bytes:
+        """Reads for up to total_timeout seconds and returns whatever
+        arrived. Bounded by total elapsed time, not by an idle gap — a
+        server that streams continuously (e.g. this login's persisted
+        live-spot filter) never produces an idle gap, so an idle-gap-based
+        read would never return.
+        """
         assert self._sock is not None
-        self._sock.settimeout(timeout)
+        deadline = time.monotonic() + total_timeout
         chunks = []
-        try:
-            while True:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            self._sock.settimeout(min(remaining, 0.5))
+            try:
                 data = self._sock.recv(4096)
-                if not data:
-                    break
-                chunks.append(data)
-        except socket.timeout:
-            pass
+            except socket.timeout:
+                continue
+            if not data:
+                break
+            chunks.append(data)
         return b"".join(chunks)
