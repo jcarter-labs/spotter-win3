@@ -92,7 +92,15 @@ class App:
         tk.Label(root, text="RBN & POTA Spotter", font=("TkDefaultFont", 16, "bold")).pack(
             pady=(8, 4)
         )
-        tk.Frame(root, height=1, bg="gray").pack(fill=tk.X, padx=20, pady=4)
+
+        # Leader line at exactly 90% width, centered (spec item 2) — place()
+        # with relwidth keeps this exact regardless of window resizing,
+        # unlike a fixed pixel padx.
+        leader_container = tk.Frame(root, height=1)
+        leader_container.pack(fill=tk.X, pady=4)
+        tk.Frame(leader_container, height=1, bg="gray").place(
+            relx=0.5, rely=0, relwidth=0.9, anchor="n"
+        )
 
         body = tk.Frame(root)
         body.pack(fill=tk.BOTH, expand=True)
@@ -115,7 +123,22 @@ class App:
         )
         self.controls.pack(side=tk.RIGHT, fill=tk.Y, padx=10)
 
-        self.scope = BandScope(body)
+        scope_column = tk.Frame(body)
+        scope_column.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Packed to the same left/right edges as each lane's own content
+        # (BandScope's cluster lane sits near x=0.08, POTA near x=0.92) so
+        # each header actually sits above its lane, not just near it.
+        headers = tk.Frame(scope_column)
+        headers.pack(fill=tk.X, padx=(8, 8))
+        tk.Label(headers, text="RBN", font=("TkDefaultFont", 10, "bold")).pack(
+            side=tk.LEFT, anchor="w"
+        )
+        tk.Label(headers, text="POTA", font=("TkDefaultFont", 10, "bold")).pack(
+            side=tk.RIGHT, anchor="e"
+        )
+
+        self.scope = BandScope(scope_column)
         self.scope.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.worker: ClusterWorker | None = None
@@ -163,15 +186,18 @@ class App:
             self.cfg.bandwidth_khz,
             self.cfg.window_minutes,
         )
-        self.controls.set_connected(
-            self._connected, len(self.store.spots_for_feed("cluster")), NC7J.name
-        )
         pota_age = (
             time.monotonic() - self._last_pota_poll
             if self._last_pota_poll is not None
             else None
         )
-        self.controls.set_pota_status(pota_age, len(self.store.spots_for_feed("pota")))
+        self.controls.set_status(
+            self._connected,
+            NC7J.name,
+            pota_age,
+            len(self.store.spots_for_feed("cluster")),
+            len(self.store.spots_for_feed("pota")),
+        )
         self.root.after(POLL_INTERVAL_MS, self._poll)
 
     def _handle_spot(self, spot: Spot) -> None:

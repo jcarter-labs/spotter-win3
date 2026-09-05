@@ -82,23 +82,33 @@ class ControlsPanel(tk.Frame):
         self.dot_canvas = tk.Canvas(status_frame, width=12, height=12, highlightthickness=0)
         self.dot_canvas.pack(side=tk.LEFT)
         self._dot = self.dot_canvas.create_oval(2, 2, 10, 10, fill="red")
-        self.status_var = tk.StringVar(value=f"Cluster: {cluster_name}")
-        tk.Label(status_frame, textvariable=self.status_var, fg="gray").pack(side=tk.LEFT, padx=(4, 0))
+        self.cluster_status_var = tk.StringVar(value=f"Cluster: {cluster_name}")
+        tk.Label(status_frame, textvariable=self.cluster_status_var, fg="gray").pack(
+            side=tk.LEFT, padx=(4, 0)
+        )
 
         self.pota_status_var = tk.StringVar(value="POTA: not yet polled")
         tk.Label(self, textvariable=self.pota_status_var, fg="gray").grid(
             row=11, column=0, columnspan=2, sticky="w", pady=(4, 0)
         )
 
-    def set_connected(self, connected: bool, shown_count: int, cluster_name: str) -> None:
-        self.dot_canvas.itemconfig(self._dot, fill="green" if connected else "red")
-        state = "connected" if connected else "disconnected"
-        self.status_var.set(f"{cluster_name}: {state} · shown {shown_count}")
+        self.shown_status_var = tk.StringVar(value="Shown: RBN 0 · POTA 0")
+        tk.Label(self, textvariable=self.shown_status_var, fg="gray").grid(
+            row=12, column=0, columnspan=2, sticky="w", pady=(4, 0)
+        )
 
-    def set_pota_status(self, poll_age_seconds: float | None, shown_count: int) -> None:
-        if poll_age_seconds is None:
+    def set_status(
+        self,
+        connected: bool,
+        cluster_name: str,
+        pota_poll_age_seconds: float | None,
+        rbn_shown: int,
+        pota_shown: int,
+    ) -> None:
+        self.dot_canvas.itemconfig(self._dot, fill="green" if connected else "red")
+        self.cluster_status_var.set(f"Cluster: {cluster_name}")
+        if pota_poll_age_seconds is None:
             self.pota_status_var.set("POTA: not yet polled")
         else:
-            self.pota_status_var.set(
-                f"POTA: last poll {int(poll_age_seconds)}s ago · shown {shown_count}"
-            )
+            self.pota_status_var.set(f"POTA: last poll {int(pota_poll_age_seconds)}s ago")
+        self.shown_status_var.set(f"Shown: RBN {rbn_shown} · POTA {pota_shown}")
