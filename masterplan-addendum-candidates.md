@@ -38,3 +38,50 @@ review at Task 6 (end-of-build addendum). Not yet applied to masterplan-v2.md.
    Task 3 (embedded-controls UI) to catch a window-sizing bug (Clear
    button/status line clipped off the right edge) that wasn't visible from
    stdout/exit-code checks alone. See scripts/screenshot_app.py.
+
+5. **"Verify per-element with pixel measurements" (Constitution rule 8) is
+   not optional decoration — it was violated for all of Tasks 3-5.** Every
+   UI "verification" in this build was: take a screenshot, look at it,
+   describe what seemed to match. That is exactly the "memory or
+   impression" standard rule 8 prohibits. It let real, measurable defects
+   ship as "done": window aspect ratio 1.06 vs. the reference's 0.41 (a
+   2.5x difference, only caught when the operator manually compared them),
+   and a missing spec-item-3 control (Cluster-server) that a literal
+   checklist against the spec text — not a visual scan of the screenshot —
+   would have caught immediately.
+   *Rule proposal:* before marking any UI task done, (a) open the
+   reference image and the actual screenshot with PIL and diff concrete
+   numbers (dimensions, aspect ratio) — never eyeball two images
+   side-by-side and call it verified; (b) build a literal checklist from
+   the spec's enumerated items (e.g. spec item 3's five named controls)
+   and confirm each is present, rather than pattern-matching general
+   resemblance to the reference image.
+   *Triggered by:* operator's own manual pressure-testing after Task 5 was
+   declared done, finding the aspect ratio wrong, a missing control, a
+   wrong window title, sluggish resize, and a silent crash on bad input —
+   all after 46 passing unit tests and multiple "verified live" screenshot
+   checks that never caught any of them.
+
+6. **Resolve conflicting instructions by asking, not by silent priority.**
+   Two defects this session came from the same root cause: an operator
+   instruction and a reference-screenshot detail pointed different ways,
+   and screenshot-fidelity was silently allowed to win without flagging
+   the conflict. (a) Window title: operator said use "spotter-win3" as
+   the naming standard (in response to a config-folder-naming question);
+   reference screenshot shows "DX Spotter" in the title bar — never
+   surfaced as a conflict, screenshot fidelity won by default. (b)
+   Cluster-server control: spec item 7 defers the profile *picker's
+   persistence/switching logic* ("only one profile is wired"); spec item
+   3 separately lists "Cluster-server" as one of five controls to embed,
+   and the reference screenshot shows it present. Read "deferred" as
+   license to omit the control from the UI entirely — conflating "don't
+   build multi-profile switching" with "don't show the control at all."
+   *Rule proposal:* when an instruction and a spec/screenshot detail (or
+   two spec items) appear to point different ways, say so explicitly and
+   ask which wins — do not silently pick one, even when one reading seems
+   more literal or convenient.
+   *Triggered by:* operator's pressure-testing catching both; both were
+   avoidable by asking a single clarifying question at the time each
+   tension was first noticed (both tensions were in fact noticed — the
+   title tension was never mentioned at all, and the control tension was
+   noticed and resolved wrongly without asking).

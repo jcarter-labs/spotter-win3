@@ -28,6 +28,22 @@ class DeclutterTests(unittest.TestCase):
         result = _declutter([0.1, 0.11, 0.12])
         self.assertEqual(result, sorted(result))
 
+    def test_heavy_cluster_stays_within_visible_range(self):
+        # Reproduces the real bug: 50 spots nearly on top of each other
+        # (e.g. a busy skimmer frequency) previously got pushed off the
+        # top of the plot entirely with no upper bound.
+        true_ys = [0.5 + i * 0.001 for i in range(50)]
+        result = _declutter(true_ys)
+        self.assertLessEqual(max(result), 1.0)
+        self.assertGreaterEqual(min(result), 0.0)
+        self.assertEqual(result, sorted(result))
+
+    def test_cluster_starting_near_top_does_not_overflow(self):
+        true_ys = [0.9 + i * 0.001 for i in range(30)]
+        result = _declutter(true_ys)
+        self.assertLessEqual(max(result), 1.0)
+        self.assertEqual(result, sorted(result))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -87,8 +87,12 @@ class App:
         self._connected = False
         self._last_pota_poll: float | None = None
 
-        root.title("DX Spotter")
-        root.geometry("900x850+0+0")
+        root.title("spotter-win3")
+        # 540x1305 matches the reference screenshot's aspect ratio (492x1189,
+        # ratio 0.414) rather than an arbitrary size — width is padded a bit
+        # over the reference's 492 to fit the added Server control and this
+        # platform's font metrics without reintroducing the Task 3 clipping bug.
+        root.geometry("540x1305+0+0")
         tk.Label(root, text="RBN & POTA Spotter", font=("TkDefaultFont", 16, "bold")).pack(
             pady=(8, 4)
         )
@@ -221,11 +225,16 @@ class App:
             spot.dx_call, band, "pota", spot.freq_khz, spot.spotter, spot.comment
         )
 
-    def _on_set_band(self, freq_mhz: float) -> None:
+    def _on_set_band(self, freq_mhz: float) -> str | None:
+        try:
+            command = NC7J.filter_command(freq_mhz)
+        except ValueError:
+            return f"{freq_mhz} MHz is not in a known amateur band"
         self.cfg.center_freq_mhz = freq_mhz
         config_module.save(self.cfg)
         assert self.worker is not None
-        self.worker.send_command(NC7J.filter_command(freq_mhz))
+        self.worker.send_command(command)
+        return None
 
     def _on_bandwidth_change(self, bandwidth_khz: int) -> None:
         self.cfg.bandwidth_khz = bandwidth_khz

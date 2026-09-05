@@ -34,6 +34,10 @@ class BandScope(tk.Frame):
         self.ax.set_xticks([])
         self.ax.set_ylim(0, 1)
         self.ax.set_xlim(0, 1)
+        # Fixed margins, not matplotlib's auto layout: at the narrow widths
+        # this scope now runs at, auto layout was squeezing the left tick
+        # labels ("14.070" etc.) against the axes, clipping them.
+        self.figure.subplots_adjust(left=0.2, right=0.98, top=0.99, bottom=0.02)
 
         self.canvas = FigureCanvasTkAgg(self.figure, master=self)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -128,13 +132,28 @@ class BandScope(tk.Frame):
             pass
 
 
+DECLUTTER_UPPER_BOUND = 0.98
+DECLUTTER_LOWER_BOUND = 0.02
+
+
 def _declutter(true_ys: list[float]) -> list[float]:
     """Greedy minimum-spacing enforcement on a list already sorted
-    ascending: pushes a label up just enough to clear the previous one."""
+    ascending: pushes a label up just enough to clear the previous one,
+    then rescales the whole sequence back inside [0, 1] if that pushed
+    labels past the visible range — under heavy spot density, an
+    unbounded push sent labels off the top of the plot entirely rather
+    than just tightly packed."""
     if not true_ys:
         return []
     adjusted = [true_ys[0]]
     for y in true_ys[1:]:
         prev = adjusted[-1]
         adjusted.append(y if y - prev >= MIN_LABEL_SPACING else prev + MIN_LABEL_SPACING)
+
+    if adjusted[-1] > DECLUTTER_UPPER_BOUND:
+        start = max(DECLUTTER_LOWER_BOUND, adjusted[0])
+        span = adjusted[-1] - adjusted[0]
+        scale = (DECLUTTER_UPPER_BOUND - start) / span if span > 0 else 1.0
+        adjusted = [start + (y - adjusted[0]) * scale for y in adjusted]
+
     return adjusted

@@ -18,12 +18,17 @@ RENDER_DELAY_MS = 15000
 
 def main() -> None:
     out_path = sys.argv[1] if len(sys.argv) > 1 else "app_screenshot.png"
+    trigger_bad_freq = "--bad-freq" in sys.argv
 
     root = tk.Tk()
     app = App(root)
     root.update()  # force geometry to settle before scheduling the capture
 
     def capture_and_exit():
+        if trigger_bad_freq:
+            app.controls.freq_var.set("not-a-number")
+            app.controls._on_set_clicked()
+            root.update()
         # Raw screen capture below — anything else on top of this window at
         # capture time would be swept in too, so force this window to the
         # foreground first (caught spotter-win2's window/terminal bleeding
