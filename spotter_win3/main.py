@@ -38,49 +38,67 @@ from spotter_win3.cluster_profiles import (
 from spotter_win3.controls import ControlsPanel
 from spotter_win3.filters import DedupCache, is_cw_mode
 from spotter_win3.pota import PotaSpot, PotaWorker
+from spotter_win3.scope_utils import in_window
 from spotter_win3.spot_store import SpotStore
 
 POLL_INTERVAL_MS = 200
+RECONNECT_BACKOFF_SECONDS = 5.0
 
 
 class ClusterWorker:
     """Owns the socket on its own daemon thread. The UI thread only ever
-    reads self.incoming and calls self.send_command()/self.stop()."""
+    reads self.incoming and calls set_filter_commands()/stop().
+
+    Auto-reconnects with a fixed backoff on connection loss (previously
+    it exited permanently, leaving status red until the operator hit
+    Clear — see improvement-queue.md item 3). The active filter commands
+    are remembered and resent automatically after every reconnect.
+    """
 
     def __init__(self, profile: ClusterProfile, callsign: str) -> None:
         self.profile = profile
         self.callsign = callsign
         self.incoming: queue.Queue = queue.Queue()
         self._outgoing: queue.Queue = queue.Queue()
+        self._current_commands: list[str] = []
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self) -> None:
         self._thread.start()
 
-    def send_command(self, command: str) -> None:
-        self._outgoing.put(command)
+    def set_filter_commands(self, commands: list[str]) -> None:
+        """Replaces the active filter commands. Sent now (if connected)
+        and automatically resent after any future reconnect."""
+        self._current_commands = list(commands)
+        for command in commands:
+            self._outgoing.put(command)
 
     def stop(self) -> None:
         self._stop.set()
 
     def _run(self) -> None:
         host, port = self.profile.hosts[0]
-        conn = ClusterConnection(host, port, self.callsign)
-        try:
-            conn.connect()
-            self.incoming.put(("status", True))
-            while not self._stop.is_set():
-                while not self._outgoing.empty():
-                    conn.send(self._outgoing.get_nowait())
-                for line in conn.read_lines(timeout=0.5):
-                    spot = parse_spot_line(line)
-                    if spot:
-                        self.incoming.put(("spot", spot))
-        except OSError:
-            self.incoming.put(("status", False))
-        finally:
-            conn.close()
+        while not self._stop.is_set():
+            conn = ClusterConnection(host, port, self.callsign)
+            try:
+                conn.connect()
+                self.incoming.put(("status", True))
+                for command in self._current_commands:
+                    conn.send(command)
+                while not self._stop.is_set():
+                    while not self._outgoing.empty():
+                        conn.send(self._outgoing.get_nowait())
+                    for line in conn.read_lines(timeout=0.5):
+                        spot = parse_spot_line(line)
+                        if spot:
+                            self.incoming.put(("spot", spot))
+            except OSError:
+                self.incoming.put(("status", False))
+            finally:
+                conn.close()
+            if not self._stop.is_set():
+                self._stop.wait(RECONNECT_BACKOFF_SECONDS)
 
 
 class App:
@@ -166,8 +184,7 @@ class App:
     def _start_worker(self) -> None:
         self.worker = ClusterWorker(self.profile, self.cfg.operator_callsign or "N0CALL")
         self.worker.start()
-        for command in self.profile.filter_commands(self.cfg.center_freq_mhz):
-            self.worker.send_command(command)
+        self.worker.set_filter_commands(self.profile.filter_commands(self.cfg.center_freq_mhz))
 
     def _poll(self) -> None:
         assert self.worker is not None
@@ -204,13 +221,18 @@ class App:
             if self._last_pota_poll is not None
             else None
         )
-        self.controls.set_status(
-            self._connected,
-            self.profile.name,
-            pota_age,
-            len(self.store.spots_for_feed("cluster")),
-            len(self.store.spots_for_feed("pota")),
+        center_khz = self.cfg.center_freq_mhz * 1000
+        rbn_shown = sum(
+            1
+            for s in self.store.spots_for_feed("cluster")
+            if in_window(s.freq_khz, center_khz, self.cfg.bandwidth_khz)
         )
+        pota_shown = sum(
+            1
+            for s in self.store.spots_for_feed("pota")
+            if in_window(s.freq_khz, center_khz, self.cfg.bandwidth_khz)
+        )
+        self.controls.set_status(self._connected, self.profile.name, pota_age, rbn_shown, pota_shown)
         self.root.after(POLL_INTERVAL_MS, self._poll)
 
     def _handle_spot(self, spot: Spot) -> None:
@@ -246,8 +268,7 @@ class App:
         self.cfg.center_freq_mhz = freq_mhz
         config_module.save(self.cfg)
         assert self.worker is not None
-        for command in commands:
-            self.worker.send_command(command)
+        self.worker.set_filter_commands(commands)
         return None
 
     def _on_bandwidth_change(self, bandwidth_khz: int) -> None:
