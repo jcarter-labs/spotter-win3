@@ -285,6 +285,7 @@ class App:
 
     def _on_clear(self) -> None:
         self.store = SpotStore()
+        self.dedup = DedupCache()
         self._connected = False
         if self.worker:
             self.worker.stop()
@@ -298,6 +299,14 @@ class App:
         self.cfg.cluster_profile = profile.name
         config_module.save(self.cfg)
         self.store = SpotStore()
+        # Dedup state must reset too, not just the store — otherwise a
+        # popular call+band already seen on the previous server within
+        # the last 2 minutes silently suppresses it as a "duplicate" on
+        # the new server, even though it's a genuinely new arrival from a
+        # different feed. Root cause of the operator's "zero spots for 5
+        # minutes on W4MYA" report — the cluster/filter/worker were all
+        # confirmed working live; this was the only layer left unreset.
+        self.dedup = DedupCache()
         self._connected = False
         if self.worker:
             self.worker.stop()
