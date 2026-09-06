@@ -34,10 +34,13 @@ class BandScope(tk.Frame):
         self.ax.set_xticks([])
         self.ax.set_ylim(0, 1)
         self.ax.set_xlim(0, 1)
-        # Fixed margins, not matplotlib's auto layout: at the narrow widths
-        # this scope now runs at, auto layout was squeezing the left tick
-        # labels ("14.070" etc.) against the axes, clipping them.
-        self.figure.subplots_adjust(left=0.2, right=0.98, top=0.99, bottom=0.02)
+        # Fixed margins, not matplotlib's auto layout. left=0.28 is a
+        # measured value, not a guess: at this scope's real composed width
+        # (~329px next to the controls panel), a tick label like "14.070"
+        # renders at 60px wide, but left=0.2 only reserved ~66px including
+        # padding — the label's left edge landed at x=-6.4px, clipping the
+        # leading digit. See scripts/measure_tick_labels.py.
+        self.figure.subplots_adjust(left=0.28, right=0.98, top=0.99, bottom=0.02)
 
         self.canvas = FigureCanvasTkAgg(self.figure, master=self)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
