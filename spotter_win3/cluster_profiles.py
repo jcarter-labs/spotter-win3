@@ -9,8 +9,17 @@ matching scripts/diag_<name>_*.py for the discovery/verification session:
   splits manual spots and RBN/skimmer spots into two separate filter
   classes (accept/spots and accept/rbn) — both need setting for full CW
   coverage.
-- W3LPL (DXSpider): diag_w3lpl_verify.py. Same software as WA9PIE-2, so
-  only the dialect's applicability was re-confirmed, not rediscovered.
+- W3LPL (DXSpider): diag_w3lpl_verify.py confirmed the accept/ filter
+  dialect applies, but a later live app test (diag_w3lpl_raw_lines.py)
+  found zero spots arrived even with the filter accepted — W3LPL's
+  banner says "CW skimmer spots are defaulted OFF", requiring a separate
+  `set/skimmer cw` to enable the feed at all (accept/rbn only restricts
+  what's shown among spots already being sent). WA9PIE-2 apparently
+  defaults skimmer on despite being the same software — a per-server
+  sysop default, not something to rely on — so `set/skimmer cw` was
+  added to the shared DXSpider dialect for both. Verified live
+  (diag_w3lpl_skimmer_enable.py): a real spot (WU8T spotting AA5JF,
+  14037.5 CW) arrived only after adding it.
 - W4MYA (CC-Cluster v3.397): an initial pass (diag_w4mya_connect.py,
   diag_w4mya_filter_fields.py, diag_w4mya_try_commands.py) found "help
   filter"/"help set" both error and three guessed command syntaxes all
@@ -66,6 +75,12 @@ def _dxspider_dialect(freq_mhz: float) -> list[str]:
     band = band_for_freq_mhz(freq_mhz)
     label = _DXSPIDER_BAND_LABELS[band]
     return [
+        # DXSpider skimmer/RBN spots can default OFF per-server (W3LPL's
+        # banner says so explicitly; WA9PIE-2 apparently defaults it on
+        # despite being the same software — a sysop-configured default,
+        # not something to rely on). accept/rbn alone got accepted with
+        # no error but delivered zero spots until this was also sent.
+        "set/skimmer cw",
         f"accept/spots on {label}/cw",
         f"accept/rbn on {label}/cw",
     ]

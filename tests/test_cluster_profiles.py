@@ -41,11 +41,13 @@ class NC7JProfileTests(unittest.TestCase):
 class WA9PIE2ProfileTests(unittest.TestCase):
     def test_filter_commands(self):
         # Confirmed live: scripts/diag_wa9pie_verify_filter.py and
-        # diag_wa9pie_verify_rbn_filter.py — both accepted and echoed
-        # back unchanged in show/filter.
+        # diag_wa9pie_verify_rbn_filter.py — accepted and echoed back
+        # unchanged in show/filter. set/skimmer cw added after W3LPL
+        # testing showed accept/rbn alone can be accepted but deliver
+        # zero spots if skimmer defaults off server-side.
         self.assertEqual(
             WA9PIE2.filter_commands(14.045),
-            ["accept/spots on 20m/cw", "accept/rbn on 20m/cw"],
+            ["set/skimmer cw", "accept/spots on 20m/cw", "accept/rbn on 20m/cw"],
         )
 
     def test_cw_trustworthy(self):
@@ -56,12 +58,15 @@ class WA9PIE2ProfileTests(unittest.TestCase):
 
 
 class W3LPLProfileTests(unittest.TestCase):
-    def test_filter_commands_same_dxspider_dialect(self):
-        # Confirmed live: scripts/diag_w3lpl_verify.py — same DXSpider
-        # dialect as WA9PIE-2, re-confirmed rather than rediscovered.
+    def test_filter_commands_include_skimmer_enable(self):
+        # scripts/diag_w3lpl_raw_lines.py: accept/rbn alone was accepted
+        # ("Filter 1 updated") but delivered zero spots in 20s — W3LPL's
+        # banner says CW skimmer defaults OFF. scripts/diag_w3lpl_
+        # skimmer_enable.py confirmed a real spot (WU8T de AA5JF,
+        # 14037.5 CW) arrives once set/skimmer cw is also sent.
         self.assertEqual(
             W3LPL.filter_commands(21.050),
-            ["accept/spots on 15m/cw", "accept/rbn on 15m/cw"],
+            ["set/skimmer cw", "accept/spots on 15m/cw", "accept/rbn on 15m/cw"],
         )
 
     def test_hosts(self):
