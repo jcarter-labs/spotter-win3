@@ -13,7 +13,11 @@ import time
 from dataclasses import dataclass
 
 _SPOT_RE = re.compile(
-    r"^DX de (?P<spotter>\S+):\s+"
+    # Colon-to-frequency gap is normally padded with spaces for column
+    # alignment, but a long spotter callsign (e.g. "DL8LAS-3-#") can fill
+    # that padding entirely, leaving zero separator — confirmed live via
+    # scripts/diag_verify_w4mya_live_spots.py. \s* not \s+.
+    r"^DX de (?P<spotter>\S+):\s*"
     r"(?P<freq_khz>\d+(?:\.\d+)?)\s+"
     r"(?P<dx_call>\S+)\s+"
     r"(?P<comment>.*?)\s*"

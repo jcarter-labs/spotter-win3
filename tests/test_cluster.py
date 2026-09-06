@@ -35,6 +35,20 @@ class ParseSpotLineTests(unittest.TestCase):
     def test_blank_line_returns_none(self):
         self.assertIsNone(parse_spot_line(""))
 
+    def test_long_spotter_name_with_no_padding_gap(self):
+        # Captured live from dxc.w4mya.us:7373 via
+        # scripts/diag_verify_w4mya_live_spots.py on 2026-09-06 — a long
+        # spotter callsign ("DL8LAS-3-#") fills the column padding
+        # entirely, leaving zero space before the frequency. This
+        # previously returned None (bug: \s+ required at least one).
+        spot = parse_spot_line(
+            "DX de DL8LAS-3-#:14037.0  AD4EB        CW 24 dB 37 WPM CQ             2312Z"
+        )
+        self.assertIsNotNone(spot)
+        self.assertEqual(spot.spotter, "DL8LAS-3-#")
+        self.assertEqual(spot.dx_call, "AD4EB")
+        self.assertEqual(spot.freq_khz, 14037.0)
+
 
 if __name__ == "__main__":
     unittest.main()
