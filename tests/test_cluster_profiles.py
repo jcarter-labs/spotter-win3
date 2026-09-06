@@ -69,23 +69,30 @@ class W3LPLProfileTests(unittest.TestCase):
 
 
 class W4MYAProfileTests(unittest.TestCase):
-    def test_no_verified_filter_command(self):
-        # scripts/diag_w4mya_try_commands.py: three plausible command
-        # guesses all errored; no working syntax found. Issues no
-        # server-side command rather than an unverified guess.
-        self.assertEqual(W4MYA.filter_commands(14.045), [])
-        self.assertEqual(W4MYA.filter_command(14.045), "")
+    def test_filter_command_rejects_all_non_cw_slots(self):
+        # Confirmed live: scripts/diag_w4mya_dxbm_filter.py — the server
+        # accepted this exact command and echoed it back in SH/FILTER
+        # DXBM, and subsequent spots were exclusively CW. Real syntax
+        # comes from the CC User Manual (Appendix B/C), not a guess.
+        command = W4MYA.filter_command(14.045)
+        self.assertTrue(command.startswith("SET/FILTER DXBM/REJECT "))
+        self.assertIn("20-RTTY", command)
+        self.assertIn("20-SSB", command)
+        self.assertNotIn("20-CW", command)
+
+    def test_filter_command_same_regardless_of_band(self):
+        # DXBM rejects segments across all bands at once, not per-band.
+        self.assertEqual(W4MYA.filter_commands(14.045), W4MYA.filter_commands(21.05))
 
     def test_out_of_band_still_raises(self):
-        # Must still validate consistently with other profiles even with
-        # no server-side command to build.
+        # Must still validate consistently with other profiles.
         with self.assertRaises(ValueError):
             W4MYA.filter_commands(6.0)
 
-    def test_cw_not_trustworthy(self):
-        # No verified server-side mode filter — client-side is_cw_mode()
-        # is the authoritative fallback (spec item 7).
-        self.assertFalse(W4MYA.cw_trustworthy)
+    def test_cw_trustworthy(self):
+        # Server-side mode filtering verified live — no client-side
+        # fallback needed for this profile.
+        self.assertTrue(W4MYA.cw_trustworthy)
 
     def test_hosts(self):
         self.assertEqual(W4MYA.hosts, (("dxc.w4mya.us", 7373),))

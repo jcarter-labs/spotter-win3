@@ -11,15 +11,19 @@ matching scripts/diag_<name>_*.py for the discovery/verification session:
   coverage.
 - W3LPL (DXSpider): diag_w3lpl_verify.py. Same software as WA9PIE-2, so
   only the dialect's applicability was re-confirmed, not rediscovered.
-- W4MYA (CC-Cluster v3.397): diag_w4mya_connect.py, diag_w4mya_filter_fields.py,
-  diag_w4mya_try_commands.py. No working server-side band+mode filter
-  command was found — "help filter"/"help set" both error, the only
-  online help is an external web page, and three plausible command
-  guesses (AR-Cluster-style, and two CC-Cluster-style guesses) all
-  errored. Per Constitution rule 10 (stop after two failed attempts, do
-  not guess a third — this had three), no further syntax was guessed.
-  This profile marks cw_trustworthy=False and relies entirely on the
-  client-side is_cw_mode() fallback (spec item 7's designed-for case).
+- W4MYA (CC-Cluster v3.397): an initial pass (diag_w4mya_connect.py,
+  diag_w4mya_filter_fields.py, diag_w4mya_try_commands.py) found "help
+  filter"/"help set" both error and three guessed command syntaxes all
+  failed, and correctly stopped per Constitution rule 10 rather than
+  guess a fourth time. CC-Cluster's real syntax turned out to be
+  documented, just not discoverable via in-band help: the CC User
+  Manual (VE7CC's own client software, https://www.g4ifb.com/
+  CC_User_Manual.pdf, Appendix B/C) documents `SET/FILTER DXBM/REJECT
+  <slot,...>`, where each slot names a band+mode segment (e.g.
+  "20-RTTY", "40-SSB") rather than mode alone — there is no bare
+  "mode=CW" command. Verified live (diag_w4mya_dxbm_filter.py):
+  rejecting every non-CW slot across all HF bands leaves only CW spots
+  flowing, confirmed by observing real post-filter traffic.
 """
 
 from __future__ import annotations
@@ -67,12 +71,29 @@ def _dxspider_dialect(freq_mhz: float) -> list[str]:
     ]
 
 
-def _no_verified_dialect(freq_mhz: float) -> list[str]:
-    # Still validates the frequency (raises ValueError out-of-band) so
-    # every profile behaves consistently for bad input, but issues no
-    # server-side command — see the W4MYA note in the module docstring.
-    band_for_freq_mhz(freq_mhz)
-    return []
+# CC-Cluster's DXBM filter has no bare "mode = CW" command — it only
+# understands band+mode segments ("20-RTTY", "40-SSB", etc, per the CC
+# User Manual Appendix C). CW-only is achieved by rejecting every other
+# segment across all recognized HF bands; this list doesn't depend on
+# the current band, so the same command is returned regardless of
+# freq_mhz (still validated for consistency with the other dialects).
+_CC_CLUSTER_NON_CW_SLOTS = (
+    "160-SSB",
+    "80-RTTY", "80-SSB",
+    "60-SSB",
+    "40-RTTY", "40-SSB",
+    "30-RTTY",
+    "20-RTTY", "20-SSB",
+    "17-RTTY", "17-SSB",
+    "15-RTTY", "15-SSB",
+    "12-RTTY", "12-SSB",
+    "10-RTTY", "10-SSB",
+)
+
+
+def _cc_cluster_dialect(freq_mhz: float) -> list[str]:
+    band_for_freq_mhz(freq_mhz)  # raises ValueError out-of-band, for consistency
+    return ["SET/FILTER DXBM/REJECT " + ",".join(_CC_CLUSTER_NON_CW_SLOTS)]
 
 
 @dataclass(frozen=True)
@@ -120,8 +141,8 @@ W3LPL = ClusterProfile(
 W4MYA = ClusterProfile(
     name="W4MYA (CC-Cluster)",
     hosts=(("dxc.w4mya.us", 7373),),
-    cw_trustworthy=False,
-    _dialect=_no_verified_dialect,
+    cw_trustworthy=True,
+    _dialect=_cc_cluster_dialect,
 )
 
 PROFILES: dict[str, ClusterProfile] = {
