@@ -1,8 +1,10 @@
 # Improvement queue
 
-Backlog of known, deliberately-deferred issues — not yet fixed. Distinct
-from `masterplan-addendum-candidates.md` (which logs process corrections
-for the Task 6 addendum, itself currently deferred).
+Backlog of known issues. Distinct from `masterplan-addendum-candidates.md`
+(which logs process corrections for the Task 6 addendum, itself currently
+deferred).
+
+## Open
 
 1. **Resize sluggishness.** `BandScope.render()` tears down and rebuilds
    every text/line artist from scratch on every 200ms poll tick,
@@ -11,28 +13,21 @@ for the Task 6 addendum, itself currently deferred).
    reuse artists instead of recreating them), not a parameter tweak.
    Deferred during Task 5 remediation.
 
+## Fixed
+
 2. **Declutter label spacing doesn't scale with window height, and
-   connector lines get visually tangled under dense clustering.**
-   `MIN_LABEL_SPACING` (bandmap.py) is a fixed fraction (0.03) of axes
-   height — at the new 1305px-tall window (post aspect-ratio fix) that's
-   ~38px between labels, ~3.5x an 8pt font's line height, reading as
-   excessive gaps. Separately, connector lines are short fixed-offset
-   stubs, not true leader lines back to the tick position, so a tight
-   cluster of same-frequency spots (e.g. 10+ POTA spots near one
-   frequency) renders as a tangle. Fix: derive spacing from actual
-   rendered font size (pixels), not a hardcoded axes-fraction; anchor or
-   suppress connector lines under high local density. Found while
-   reviewing Screenshot 2026-09-06 131446.png.
+   connector lines get visually tangled under dense clustering.** Fixed
+   in `af92848`: `_label_spacing_fraction()` derives spacing from actual
+   rendered font height in pixels instead of a fixed axes-height
+   fraction; connector lines now trace from the spine to the label
+   instead of a tiny fixed-offset stub. Verified live via screenshot.
 
-3. **No auto-reconnect on cluster disconnect.** If the cluster connection
-   drops, `ClusterWorker` exits its loop and status goes red permanently
-   — only the Clear button restarts it. Flagged during Task 5
-   pressure-testing, not yet fixed.
+3. **No auto-reconnect on cluster disconnect.** Fixed in `335a590`:
+   `ClusterWorker._run` now loops with a fixed backoff on connection
+   loss instead of exiting permanently, resending the active filter
+   commands (tracked via `set_filter_commands()`) after every reconnect.
 
-4. **"Shown" count includes off-window spots.** `Shown: RBN n` counts
-   everything currently held in the store for that feed, not just spots
-   falling inside the currently-visible frequency window (`in_window`
-   filtering only applies to rendering, not to the count). Can make the
-   count look inconsistent with what's actually on screen — e.g. non-zero
-   "shown" with an empty visible lane right after a band change. Flagged
-   during Task 5 remediation verification, not yet fixed.
+4. **"Shown" count includes off-window spots.** Fixed in `335a590`:
+   counts now filtered through the same `in_window()` check used for
+   rendering. Verified live: "Shown: RBN 7 · POTA 19" matched an exact
+   manual count of the rendered labels in the same screenshot.
