@@ -28,6 +28,7 @@ class ControlsPanel(tk.Frame):
         initial_tier: str,
         cluster_name: str,
         cluster_options: list[str] | None = None,
+        on_server_change: Callable[[str], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, **kwargs)
@@ -78,10 +79,8 @@ class ControlsPanel(tk.Frame):
                 command=lambda: on_tier_change(self.tier_var.get()),
             ).grid(row=8 + i, column=0, sticky="w")
 
-        # Only one profile is wired (spec item 7 — picker/persistence
-        # across profiles is deferred), but the reference screenshot shows
-        # the control present regardless, so it's a real (single-entry)
-        # dropdown rather than omitted.
+        # Four profiles now wired (NC7J, WA9PIE-2, W3LPL, W4MYA) —
+        # switching actually reconnects (see App._on_server_change).
         tk.Label(self, text="Server").grid(row=10, column=0, sticky="w", pady=(8, 0))
         options = cluster_options or [cluster_name]
         self.server_var = tk.StringVar(value=cluster_name)
@@ -89,6 +88,10 @@ class ControlsPanel(tk.Frame):
             self, textvariable=self.server_var, values=options, state="readonly", width=20
         )
         server.grid(row=11, column=0, columnspan=2, sticky="w")
+        if on_server_change is not None:
+            server.bind(
+                "<<ComboboxSelected>>", lambda e: on_server_change(self.server_var.get())
+            )
 
         tk.Button(self, text="Clear", command=on_clear).grid(
             row=12, column=0, columnspan=2, pady=(12, 0), sticky="ew"

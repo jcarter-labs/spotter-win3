@@ -29,9 +29,14 @@ if sys.platform == "win32":
 from spotter_win3 import config as config_module
 from spotter_win3.bandmap import BandScope
 from spotter_win3.cluster import ClusterConnection, Spot, parse_spot_line
-from spotter_win3.cluster_profiles import NC7J, ClusterProfile, band_for_freq_mhz
+from spotter_win3.cluster_profiles import (
+    DEFAULT_PROFILE,
+    PROFILES,
+    ClusterProfile,
+    band_for_freq_mhz,
+)
 from spotter_win3.controls import ControlsPanel
-from spotter_win3.filters import DedupCache
+from spotter_win3.filters import DedupCache, is_cw_mode
 from spotter_win3.pota import PotaSpot, PotaWorker
 from spotter_win3.spot_store import SpotStore
 
@@ -82,6 +87,7 @@ class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.cfg = config_module.load()
+        self.profile: ClusterProfile = PROFILES.get(self.cfg.cluster_profile, DEFAULT_PROFILE)
         self.store = SpotStore()
         self.dedup = DedupCache()
         self._connected = False
@@ -119,11 +125,13 @@ class App:
             on_window_change=self._on_window_change,
             on_tier_change=self._on_tier_change,
             on_clear=self._on_clear,
+            on_server_change=self._on_server_change,
             initial_freq_mhz=self.cfg.center_freq_mhz,
             initial_bandwidth_khz=self.cfg.bandwidth_khz,
             initial_window_min=self.cfg.window_minutes,
             initial_tier=self.cfg.spotter_tier,
-            cluster_name=NC7J.name,
+            cluster_name=self.profile.name,
+            cluster_options=list(PROFILES.keys()),
         )
         self.controls.pack(side=tk.RIGHT, fill=tk.Y, padx=10)
 
@@ -156,9 +164,10 @@ class App:
         self.root.after(POLL_INTERVAL_MS, self._poll)
 
     def _start_worker(self) -> None:
-        self.worker = ClusterWorker(NC7J, self.cfg.operator_callsign or "N0CALL")
+        self.worker = ClusterWorker(self.profile, self.cfg.operator_callsign or "N0CALL")
         self.worker.start()
-        self.worker.send_command(NC7J.filter_command(self.cfg.center_freq_mhz))
+        for command in self.profile.filter_commands(self.cfg.center_freq_mhz):
+            self.worker.send_command(command)
 
     def _poll(self) -> None:
         assert self.worker is not None
@@ -197,7 +206,7 @@ class App:
         )
         self.controls.set_status(
             self._connected,
-            NC7J.name,
+            self.profile.name,
             pota_age,
             len(self.store.spots_for_feed("cluster")),
             len(self.store.spots_for_feed("pota")),
@@ -208,6 +217,10 @@ class App:
         try:
             band = band_for_freq_mhz(spot.freq_khz / 1000)
         except ValueError:
+            return
+        # Client-side authoritative fallback for profiles with no verified
+        # server-side mode filter (spec item 7) — currently only W4MYA.
+        if not self.profile.cw_trustworthy and not is_cw_mode(spot):
             return
         if self.dedup.is_duplicate(spot.dx_call, band):
             return
@@ -227,13 +240,14 @@ class App:
 
     def _on_set_band(self, freq_mhz: float) -> str | None:
         try:
-            command = NC7J.filter_command(freq_mhz)
+            commands = self.profile.filter_commands(freq_mhz)
         except ValueError:
             return f"{freq_mhz} MHz is not in a known amateur band"
         self.cfg.center_freq_mhz = freq_mhz
         config_module.save(self.cfg)
         assert self.worker is not None
-        self.worker.send_command(command)
+        for command in commands:
+            self.worker.send_command(command)
         return None
 
     def _on_bandwidth_change(self, bandwidth_khz: int) -> None:
@@ -249,6 +263,19 @@ class App:
         config_module.save(self.cfg)
 
     def _on_clear(self) -> None:
+        self.store = SpotStore()
+        self._connected = False
+        if self.worker:
+            self.worker.stop()
+        self._start_worker()
+
+    def _on_server_change(self, profile_name: str) -> None:
+        profile = PROFILES.get(profile_name)
+        if profile is None or profile is self.profile:
+            return
+        self.profile = profile
+        self.cfg.cluster_profile = profile.name
+        config_module.save(self.cfg)
         self.store = SpotStore()
         self._connected = False
         if self.worker:
