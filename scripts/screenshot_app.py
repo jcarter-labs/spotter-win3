@@ -13,7 +13,7 @@ from PIL import ImageGrab
 
 from spotter_win3.main import App
 
-RENDER_DELAY_MS = 15000
+RENDER_DELAY_MS = 30000
 
 
 def main() -> None:
