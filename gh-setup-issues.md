@@ -2,7 +2,7 @@
 
 Log of problems hit while resolving Task 0's "repo name and visibility"
 requirement, with recommended masterplan additions. Feeds Task 6
-(end-of-build addendum) alongside `masterplan-addendum-candidates.md`.
+(end-of-build addendum) alongside `win3-addenda.md`.
 
 ## Issues encountered
 
@@ -72,5 +72,5 @@ any remote.
    paths on Windows, since it executes through Git Bash regardless of the
    session's primary shell.
 
-(See `masterplan-addendum-candidates.md` for the non-gh-specific candidate:
+(See `win3-addenda.md` for the non-gh-specific candidates, including
 step-by-step confirmation scoped to auth/credential operations only.)

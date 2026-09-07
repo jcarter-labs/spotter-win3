@@ -1,8 +1,8 @@
 # Improvement queue
 
-Backlog of known issues. Distinct from `masterplan-addendum-candidates.md`
-(which logs process corrections for the Task 6 addendum, itself currently
-deferred).
+Backlog of known issues. Distinct from `win3-addenda.md` (which logs
+masterplan changes/process corrections for the Task 6 addendum, itself
+currently deferred).
 
 ## Open
 
