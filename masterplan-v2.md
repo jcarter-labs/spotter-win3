@@ -50,12 +50,14 @@ telnet DX cluster and from POTA activators on one frequency bandmap.
    not guessing. Report once, when the list is exhausted.
    *Prevents: turns spent telling you to look something up; escalating
    a decision already made.*
-8. Verify UI against the screenshot per element and with pixel
-   measurements, not memory or impression — measure the running app and
-   compare it against the screenshot, and re-check independently on
-   each platform, since display scaling (Retina, Windows DPI, Linux
-   desktop scaling) differs enough that one platform's fix doesn't
-   guarantee another's.
+8. UI verification is a required artifact, not a described action —
+   the first window-rendering task produces `tools/verify_layout.py`,
+   measuring rendered geometry against `docs/reference-measurements.json`.
+   No layout task is complete without a fresh run, pass/fail table
+   pasted as evidence — not a screenshot. Re-run independently on each
+   platform, since display scaling (Retina, Windows DPI, Linux desktop
+   scaling) differs enough that one platform's pass doesn't guarantee
+   another's.
    *Prevents: a layout gap surviving into the next platform's build.*
 9. Always build and run through a project-local venv, never a bare
    `python3`/`python`: `python3.13 -m venv .venv` (Windows: `py -3.13
@@ -167,7 +169,7 @@ remediation, and anything not listed here.
    tests for spot parsing.
 5. UI polish pass — title, leader line, lane headers, mirrored POTA
    spine/ticks, status block in the controls panel; verify per-element
-   and per-platform against the reference screenshot.
+   and per-platform with `tools/verify_layout.py` (Constitution 8).
 6. End-of-build addendum — before the final commit, review this
    session's human turns, identify each correction and environment fix,
    and propose the rule that would have prevented it as a diff to this
