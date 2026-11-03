@@ -1,6 +1,6 @@
 # DX Spotter (Windows): a Bandscope-style bandmap for CW, RBN and POTA
 
-![DX Spotter running on Windows](images/win3-screenshot.png)
+![DX Spotter running on Windows](images/fig-2-dx-spotter-win3-screenshot.png)
 
 *The app on Windows 11 (live data, W4MYA cluster, Regional spotters, 14.045 MHz, 50 kHz span, 10-minute window).*
 
