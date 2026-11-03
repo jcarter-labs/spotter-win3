@@ -1,6 +1,6 @@
 # DX Spotter (Windows): a Bandscope-style bandmap for CW, RBN and POTA
 
-![DX Spotter running on Windows](docs/images/win3-screenshot.png)
+![DX Spotter running on Windows](images/win3-screenshot.png)
 
 *The app on Windows 11 (live data, W4MYA cluster, Regional spotters, 14.045 MHz, 50 kHz span, 10-minute window).*
 
@@ -27,7 +27,7 @@ Here the masterplan is [`masterplan-v2.md`](masterplan-v2.md), a revision of the
 | File | Role |
 |---|---|
 | [`masterplan-v2.md`](masterplan-v2.md) | Source of truth for the build. Four parts: **Constitution** (rules for how the agent works, each with the failure it prevents), **Spec**, **Tech**, **Tasks** (Task 0 environment through Task 6 end-of-build addendum). |
-| [`spotter-linux.png`](docs/images/spotter-linux.png) | The look to match: an existing Linux app of the same kind. |
+| [`spotter-linux.png`](images/spotter-linux.png) | The look to match: an existing Linux app of the same kind. |
 | [`win3-addenda.md`](win3-addenda.md) | Changes to the masterplan, applied and proposed, consolidated. |
 | [`improvement-queue.md`](improvement-queue.md) | Known issues: open and fixed, with commit references. |
 | [`gh-setup-issues.md`](gh-setup-issues.md) | Git and GitHub setup problems hit in Task 0, with recommended masterplan additions. |
