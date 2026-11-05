@@ -139,11 +139,13 @@ def bench_render(scope: BandScope, store: SpotStore, reps: int) -> tuple[float, 
 
 
 def simulate_redraws_per_s(spot_rate: float, hz: float, seconds: float = 120.0, seed: int = 7) -> float:
-    """Redraws/s the real RedrawGate allows at ``hz`` ticks/s with Poisson spot
-    arrivals (any arrival in a tick marks it dirty). Deterministic per seed."""
+    """Redraws/s the real RedrawGate allows at ``hz`` ticks/s. Two independent
+    Poisson sources mark it dirty, as in App._poll: spot arrivals, and prune()
+    expiring spots (steady state: expiries ~ arrivals, once the window is full).
+    Deterministic per seed."""
     rng = random.Random(seed)
     gate, dt = RedrawGate(), 1.0 / hz
-    p_arrival = 1.0 - math.exp(-spot_rate * dt)
+    p_arrival = 1.0 - math.exp(-2 * spot_rate * dt)  # arrivals + expiries
     redraws, now = 0, 0.0
     for _ in range(int(seconds * hz)):
         if rng.random() < p_arrival:
@@ -198,11 +200,11 @@ def main() -> None:
     print(f"UI thread is one core: demand above 100% of a core saturates at "
           f"{100 / cpus:.2f}% of total.")
 
-    print(f"\nWith RedrawGate (skips unchanged ticks; fade refresh every {FADE_REFRESH_SECONDS:g} s):")
+    print(f"\nWith RedrawGate (skips unchanged ticks; fade refresh every {FADE_REFRESH_SECONDS:g} s; steady-state expiries = arrivals):")
     print(f"{'spot arrivals':<34}{'redraws/s':>14}   CPU (frame cost x redraws/s)")
     for rate in (0, 1, 3, 10):
         rps = simulate_redraws_per_s(rate, args.hz)
-        print(f"{str(rate) + ' spots/s':<34}{rps:>14.2f}   {pct((frame_s + per_scan) * rps + per_scan * args.hz, cpus)}")
+        print(f"{str(rate) + ' spots/s':<34}{rps:>14.2f}   {pct(frame_s * rps + per_scan * args.hz, cpus)}")
 
     if args.profile:
         prof = cProfile.Profile()

@@ -171,8 +171,12 @@ class App:
 
         self.scope = BandScope(scope_column)
         self.scope.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        # Label declutter depends on pixel height, so a resize needs a re-layout.
-        self.scope.bind("<Configure>", lambda _e: self._redraw.mark_dirty())
+        # Label declutter depends on the canvas's pixel height, so a resize
+        # needs a re-layout. Bound on the canvas widget itself, not the outer
+        # Frame, whose <Configure> can fire before the canvas has its new size.
+        self.scope.canvas.get_tk_widget().bind(
+            "<Configure>", lambda _e: self._redraw.mark_dirty(), add="+"
+        )
 
         self.worker: ClusterWorker | None = None
         self._start_worker()
