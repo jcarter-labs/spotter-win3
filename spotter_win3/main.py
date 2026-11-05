@@ -38,7 +38,7 @@ from spotter_win3.cluster_profiles import (
 from spotter_win3.controls import ControlsPanel
 from spotter_win3.filters import DedupCache, is_cw_mode
 from spotter_win3.pota import PotaSpot, PotaWorker
-from spotter_win3.scope_utils import in_window
+from spotter_win3.scope_utils import RedrawGate, in_window
 from spotter_win3.spot_store import SpotStore
 
 POLL_INTERVAL_MS = 200
@@ -110,6 +110,7 @@ class App:
         self.dedup = DedupCache()
         self._connected = False
         self._last_pota_poll: float | None = None
+        self._redraw = RedrawGate()
 
         root.title("spotter-win3")
         # 540x1305 matches the reference screenshot's aspect ratio (492x1189,
@@ -170,6 +171,8 @@ class App:
 
         self.scope = BandScope(scope_column)
         self.scope.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Label declutter depends on pixel height, so a resize needs a re-layout.
+        self.scope.bind("<Configure>", lambda _e: self._redraw.mark_dirty())
 
         self.worker: ClusterWorker | None = None
         self._start_worker()
@@ -208,14 +211,20 @@ class App:
         except queue.Empty:
             pass
 
+        before = len(self.store)
         self.store.prune(self.cfg.window_minutes * 60)
-        self.scope.render(
-            self.store.spots_for_feed("cluster"),
-            self.store.spots_for_feed("pota"),
-            self.cfg.center_freq_mhz * 1000,
-            self.cfg.bandwidth_khz,
-            self.cfg.window_minutes,
-        )
+        if len(self.store) != before:
+            self._redraw.mark_dirty()
+        # Full artist rebuild + repaint is the expensive step; skip it unless
+        # something changed or the slow fade refresh is due.
+        if self._redraw.should_redraw(time.monotonic()):
+            self.scope.render(
+                self.store.spots_for_feed("cluster"),
+                self.store.spots_for_feed("pota"),
+                self.cfg.center_freq_mhz * 1000,
+                self.cfg.bandwidth_khz,
+                self.cfg.window_minutes,
+            )
         pota_age = (
             time.monotonic() - self._last_pota_poll
             if self._last_pota_poll is not None
@@ -249,6 +258,7 @@ class App:
         self.store.upsert(
             spot.dx_call, band, "cluster", spot.freq_khz, spot.spotter, spot.comment
         )
+        self._redraw.mark_dirty()
 
     def _handle_pota_spot(self, spot: PotaSpot) -> None:
         try:
@@ -259,6 +269,7 @@ class App:
         self.store.upsert(
             spot.dx_call, band, "pota", spot.freq_khz, spot.spotter, spot.comment
         )
+        self._redraw.mark_dirty()
 
     def _on_set_band(self, freq_mhz: float) -> str | None:
         try:
@@ -267,6 +278,7 @@ class App:
             return f"{freq_mhz} MHz is not in a known amateur band"
         self.cfg.center_freq_mhz = freq_mhz
         config_module.save(self.cfg)
+        self._redraw.mark_dirty()
         assert self.worker is not None
         self.worker.set_filter_commands(commands)
         return None
@@ -274,16 +286,19 @@ class App:
     def _on_bandwidth_change(self, bandwidth_khz: int) -> None:
         self.cfg.bandwidth_khz = bandwidth_khz
         config_module.save(self.cfg)
+        self._redraw.mark_dirty()
 
     def _on_window_change(self, window_min: int) -> None:
         self.cfg.window_minutes = window_min
         config_module.save(self.cfg)
+        self._redraw.mark_dirty()
 
     def _on_tier_change(self, tier: str) -> None:
         self.cfg.spotter_tier = tier
         config_module.save(self.cfg)
 
     def _on_clear(self) -> None:
+        self._redraw.mark_dirty()
         self.store = SpotStore()
         self.dedup = DedupCache()
         self._connected = False
@@ -295,6 +310,7 @@ class App:
         profile = PROFILES.get(profile_name)
         if profile is None or profile is self.profile:
             return
+        self._redraw.mark_dirty()
         self.profile = profile
         self.cfg.cluster_profile = profile.name
         config_module.save(self.cfg)

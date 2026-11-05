@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import cProfile
+import math
 import os
 import pstats
 import queue
@@ -36,7 +37,7 @@ from spotter_win3.cluster import parse_spot_line
 from spotter_win3.cluster_profiles import band_for_freq_mhz
 from spotter_win3.filters import DedupCache, is_cw_mode
 from spotter_win3.main import POLL_INTERVAL_MS
-from spotter_win3.scope_utils import in_window
+from spotter_win3.scope_utils import FADE_REFRESH_SECONDS, RedrawGate, in_window
 from spotter_win3.spot_store import SpotStore
 
 CENTER_KHZ = 14045.0
@@ -137,6 +138,21 @@ def bench_render(scope: BandScope, store: SpotStore, reps: int) -> tuple[float, 
     return statistics.median(build), statistics.median(raster), statistics.median(blit)
 
 
+def simulate_redraws_per_s(spot_rate: float, hz: float, seconds: float = 120.0, seed: int = 7) -> float:
+    """Redraws/s the real RedrawGate allows at ``hz`` ticks/s with Poisson spot
+    arrivals (any arrival in a tick marks it dirty). Deterministic per seed."""
+    rng = random.Random(seed)
+    gate, dt = RedrawGate(), 1.0 / hz
+    p_arrival = 1.0 - math.exp(-spot_rate * dt)
+    redraws, now = 0, 0.0
+    for _ in range(int(seconds * hz)):
+        if rng.random() < p_arrival:
+            gate.mark_dirty()
+        redraws += gate.should_redraw(now)
+        now += dt
+    return redraws / seconds
+
+
 def pct(seconds_per_s: float, logical_cpus: int) -> str:
     return f"{seconds_per_s * 100:5.2f}% of a core / {seconds_per_s * 100 / logical_cpus:5.2f}% of total"
 
@@ -181,6 +197,12 @@ def main() -> None:
     print(f"{'UI tick demand (scans+frame)':<34}{frame_s * 1e3:>11.2f} ms   {pct(total, cpus)}")
     print(f"UI thread is one core: demand above 100% of a core saturates at "
           f"{100 / cpus:.2f}% of total.")
+
+    print(f"\nWith RedrawGate (skips unchanged ticks; fade refresh every {FADE_REFRESH_SECONDS:g} s):")
+    print(f"{'spot arrivals':<34}{'redraws/s':>14}   CPU (frame cost x redraws/s)")
+    for rate in (0, 1, 3, 10):
+        rps = simulate_redraws_per_s(rate, args.hz)
+        print(f"{str(rate) + ' spots/s':<34}{rps:>14.2f}   {pct((frame_s + per_scan) * rps + per_scan * args.hz, cpus)}")
 
     if args.profile:
         prof = cProfile.Profile()
