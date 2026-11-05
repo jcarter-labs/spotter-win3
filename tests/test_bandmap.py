@@ -1,6 +1,15 @@
+import tkinter as tk
 import unittest
 
-from spotter_win3.bandmap import MIN_LABEL_SPACING, _declutter, _label_spacing_fraction
+from matplotlib.colors import to_hex
+
+from spotter_win3.bandmap import (
+    MIN_LABEL_SPACING,
+    BandScope,
+    _declutter,
+    _label_spacing_fraction,
+    _tk_color_hex,
+)
 
 
 class DeclutterTests(unittest.TestCase):
@@ -69,6 +78,31 @@ class LabelSpacingFractionTests(unittest.TestCase):
 
     def test_zero_height_falls_back_to_constant(self):
         self.assertEqual(_label_spacing_fraction(canvas_height_px=0, dpi=100), MIN_LABEL_SPACING)
+
+
+class OpaqueFigureTests(unittest.TestCase):
+    """A transparent figure made the Tk blit ~86x slower (364 ms vs 4 ms per
+    frame at 590x1360); the figure must stay opaque in the widget colour."""
+
+    def setUp(self):
+        try:
+            self.root = tk.Tk()
+        except tk.TclError as exc:
+            self.skipTest(f"no display: {exc}")
+        self.root.withdraw()
+        self.addCleanup(self.root.destroy)
+
+    def test_tk_color_hex_resolves_names_and_system_colours(self):
+        self.assertEqual(_tk_color_hex(self.root, "#112233"), "#112233")
+        self.assertEqual(_tk_color_hex(self.root, "red"), "#ff0000")
+        # System colours are what matplotlib itself can't parse.
+        self.assertRegex(_tk_color_hex(self.root, self.root.cget("bg")), r"^#[0-9a-f]{6}$")
+
+    def test_figure_is_opaque_and_matches_widget_background(self):
+        scope = BandScope(self.root)
+        face = scope.figure.patch.get_facecolor()
+        self.assertEqual(face[3], 1.0)
+        self.assertEqual(to_hex(face), _tk_color_hex(scope, scope.cget("bg")))
 
 
 if __name__ == "__main__":

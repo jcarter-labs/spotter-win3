@@ -1,7 +1,8 @@
 """Bandmap scope widget: vertical frequency spine, RBN and POTA spots each
 in their own lane (left/right), plotted by frequency with alpha-fade
-aging. No boxed border — left spine + tick labels only, transparent
-background (spec item 4). The POTA lane gets a mirrored spine + tick
+aging. No boxed border — left spine + tick labels only, and a background
+that looks transparent (spec item 4) by matching the Tk widget colour
+exactly; see the opaque-figure note in BandScope.__init__. The POTA lane gets a mirrored spine + tick
 marks (no duplicate numeric labels, since both lanes share one frequency
 range) drawn manually rather than via a second Axes, and each lane runs
 its own greedy declutter pass so close-frequency labels don't overlap —
@@ -26,11 +27,22 @@ SUBPLOT_TOP = 0.99
 SUBPLOT_BOTTOM = 0.02
 
 
+def _tk_color_hex(widget: tk.Misc, color: str) -> str:
+    """Any Tk colour (name, #rrggbb, or a system colour like SystemButtonFace
+    that matplotlib can't parse) as #rrggbb."""
+    r, g, b = (c >> 8 for c in widget.winfo_rgb(color))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
 class BandScope(tk.Frame):
     def __init__(self, master: tk.Widget, **kwargs) -> None:
         super().__init__(master, **kwargs)
-        self.figure = Figure(figsize=(3, 8), dpi=100)
-        self.figure.patch.set_alpha(0.0)
+        # Opaque in the widget's own background colour, not alpha 0: a
+        # transparent figure sends the Tk blit down a per-pixel alpha
+        # compositing path (~364 ms/frame vs ~4 ms opaque at 590x1360,
+        # measured by scripts/profile_hotpaths.py). Looks identical on the
+        # flat Tk background; the axes patch stays transparent over it.
+        self.figure = Figure(figsize=(3, 8), dpi=100, facecolor=_tk_color_hex(self, self.cget("bg")))
         self.ax = self.figure.add_subplot(111)
         self.ax.patch.set_alpha(0.0)
         for side in ("top", "right", "bottom"):
